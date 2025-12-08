@@ -26,18 +26,23 @@ class Quiz(BaseModel):
 # --- ИНТЕРФЕЙС ---
 st.title("🎓 AI Course Generator")
 
-# 1. Явная проверка ключей с возможностью ввода
-llama_key = os.getenv("LLAMA_CLOUD_API_KEY")
-openai_key = os.getenv("OPENAI_API_KEY")
+# БЕЗОПАСНАЯ ПРОВЕРКА КЛЮЧЕЙ
+# Мы проверяем наличие ключей на сервере, но НЕ отправляем их в браузер пользователя
+has_llama = bool(os.getenv("LLAMA_CLOUD_API_KEY"))
+has_openai = bool(os.getenv("OPENAI_API_KEY"))
 
-with st.expander("🔐 Настройки ключей (Нажми, если ошибка)", expanded=not (llama_key and openai_key)):
-    new_llama = st.text_input("LlamaCloud Key (llx-...)", value=llama_key or "", type="password")
-    new_openai = st.text_input("OpenAI Key (sk-...)", value=openai_key or "", type="password")
+if has_llama and has_openai:
+    st.success("✅ API ключи загружены из безопасного хранилища (Streamlit Secrets).")
+else:
+    st.warning("⚠️ Ключи не найдены в настройках сервера. Введите их вручную для работы:")
+    # Поля ввода показываем ТОЛЬКО если ключей нет на сервере. И они пустые.
+    new_llama = st.text_input("LlamaCloud Key (llx-...)", type="password")
+    new_openai = st.text_input("OpenAI Key (sk-...)", type="password")
     
     if new_llama and new_openai:
         os.environ["LLAMA_CLOUD_API_KEY"] = new_llama
         os.environ["OPENAI_API_KEY"] = new_openai
-        st.success("Ключи обновлены!")
+        st.rerun() # Перезагружаем страницу, чтобы применить
 
 uploaded_file = st.file_uploader("Загрузи PDF инструкцию", type=["pdf"])
 
