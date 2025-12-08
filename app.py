@@ -45,7 +45,7 @@ with st.sidebar:
     quiz_count = st.slider("Количество вопросов:", 1, 10, 3)
 
 # --- ОСНОВНОЙ ЭКРАН ---
-st.title("🎓 AI Course Generator")
+st.title("🎓 CourseFlow AI_Test Generator")
 
 # БЕЗОПАСНАЯ ПРОВЕРКА КЛЮЧЕЙ
 has_llama = bool(os.getenv("LLAMA_CLOUD_API_KEY"))
