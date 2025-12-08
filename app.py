@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import tempfile
+import base64
 from dotenv import load_dotenv
 from llama_parse import LlamaParse
 from llama_index.core import SimpleDirectoryReader, Settings
@@ -25,8 +26,14 @@ class Quiz(BaseModel):
 
 # --- БОКОВАЯ ПАНЕЛЬ ---
 with st.sidebar:
+
     st.header("⚙️ Настройки")
+    st.header("🏢 Брендинг")
+    company_logo = st.file_uploader("Логотип компании (PNG/JPG)", type=["png", "jpg", "jpeg"])
     
+    if company_logo:
+        st.image(company_logo, width=100) # Предпросмотр
+
     quiz_lang = st.selectbox(
         "Язык теста:",
         ["Русский", "English", "Қазақша", "O'zbekcha", "Кыргызча", "Español", "Deutsch"],
@@ -123,12 +130,100 @@ if uploaded_file:
                 st.error(f"Ошибка AI: {e}")
                 st.stop()
 
-# --- ВЫВОД ---
+# --- ВЫВОД РЕЗУЛЬТАТА ---
 if 'quiz' in st.session_state:
     st.divider()
+    
+    # Отображаем вопросы на экране
     for i, q in enumerate(st.session_state['quiz'].questions):
         st.subheader(f"{i+1}. {q.scenario}")
         st.radio("Варианты:", q.options, key=f"q{i}")
         with st.expander("Показать ответ"):
             st.write(f"Правильно: {q.options[q.correct_option_id]}")
             st.info(q.explanation)
+
+    st.divider()
+    st.subheader("📦 Экспорт курса")
+    
+    # ЛОГИКА ВСТАВКИ ЛОГОТИПА
+    logo_html = ""
+    if company_logo:
+        # Превращаем файл картинки в строку Base64
+        import base64
+        # Возвращаем курсор в начало файла, чтобы прочитать его
+        company_logo.seek(0)
+        b64_data = base64.b64encode(company_logo.read()).decode()
+        mime_type = company_logo.type
+        # Создаем HTML тег с картинкой внутри
+        logo_html = f'<img src="data:{mime_type};base64,{b64_data}" style="max-width: 150px; margin-bottom: 20px;">'
+
+    # Генерируем HTML
+    quiz_json = st.session_state['quiz'].model_dump_json()
+    
+    html_template = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Course Export</title>
+        <style>
+            body {{ font-family: sans-serif; max_width: 800px; margin: 0 auto; padding: 20px; background: #f4f4f9; }}
+            .header {{ text-align: center; margin-bottom: 30px; }}
+            .card {{ background: white; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }}
+            .btn {{ display: inline-block; padding: 10px 20px; background: #007bff; color: white; cursor: pointer; border-radius: 5px; }}
+            .btn:hover {{ background: #0056b3; }}
+            .feedback {{ margin-top: 10px; font-weight: bold; display: none; }}
+            .correct {{ color: green; }}
+            .wrong {{ color: red; }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            {logo_html} <h1>🎓 Экзамен / Test</h1>
+        </div>
+        
+        <div id="quiz-container"></div>
+
+        <script>
+            const quizData = {quiz_json};
+            const container = document.getElementById('quiz-container');
+
+            quizData.questions.forEach((q, index) => {{
+                const card = document.createElement('div');
+                card.className = 'card';
+                let optionsHtml = '';
+                q.options.forEach(opt => {{
+                    optionsHtml += `<label style="display:block; margin: 5px 0; cursor: pointer;">
+                        <input type="radio" name="q${{index}}" value="${{opt}}"> ${{opt}}
+                    </label>`;
+                }});
+                card.innerHTML = `<h3>${{index + 1}}. ${{q.scenario}}</h3><form>${{optionsHtml}}</form><div class="btn" onclick="checkAnswer(${{index}})">Проверить</div><div class="feedback" id="feedback-${{index}}"></div>`;
+                container.appendChild(card);
+            }});
+
+            function checkAnswer(index) {{
+                const q = quizData.questions[index];
+                const selected = document.querySelector(`input[name="q${{index}}"]:checked`);
+                const fb = document.getElementById(`feedback-${{index}}`);
+                if (!selected) return alert("Выберите ответ!");
+                fb.style.display = 'block';
+                const correct = q.options[q.correct_option_id];
+                if (selected.value === correct) {{
+                    fb.className = 'feedback correct';
+                    fb.innerHTML = "✅ " + q.explanation;
+                }} else {{
+                    fb.className = 'feedback wrong';
+                    fb.innerHTML = "❌ Правильный ответ: " + correct;
+                }}
+            }}
+        </script>
+    </body>
+    </html>
+    """
+
+    st.download_button(
+        label="📥 Скачать брендированный HTML",
+        data=html_template,
+        file_name="branded_course.html",
+        mime="text/html"
+    )
