@@ -23,29 +23,26 @@ class QuizQuestion(BaseModel):
 class Quiz(BaseModel):
     questions: List[QuizQuestion]
 
-# --- БОКОВАЯ ПАНЕЛЬ (НАСТРОЙКИ) ---
+# --- БОКОВАЯ ПАНЕЛЬ ---
 with st.sidebar:
     st.header("⚙️ Настройки")
     
-    # Выбор языка (Включая Узбекский и Кыргызский)
     quiz_lang = st.selectbox(
         "Язык теста:",
         ["Русский", "English", "Қазақша", "O'zbekcha", "Кыргызча", "Español", "Deutsch"],
         index=0
     )
     
-    # Сложность
     quiz_difficulty = st.radio(
         "Сложность:",
         ["Easy (Факты)", "Hard (Кейсы)"],
         index=1
     )
     
-    # Количество вопросов
     quiz_count = st.slider("Количество вопросов:", 1, 10, 3)
 
 # --- ОСНОВНОЙ ЭКРАН ---
-st.title("🎓 CourseFlow AI_Test Generator")
+st.title("🎓 AI Course Generator")
 
 # БЕЗОПАСНАЯ ПРОВЕРКА КЛЮЧЕЙ
 has_llama = bool(os.getenv("LLAMA_CLOUD_API_KEY"))
@@ -54,7 +51,7 @@ has_openai = bool(os.getenv("OPENAI_API_KEY"))
 if has_llama and has_openai:
     st.success("✅ Ключи активны (Secure Mode)")
 else:
-    st.warning("⚠️ Ключи не найдены. Введите их (они не будут сохранены в браузере):")
+    st.warning("⚠️ Ключи не найдены. Введите их вручную:")
     new_llama = st.text_input("LlamaCloud Key", type="password")
     new_openai = st.text_input("OpenAI Key", type="password")
     
@@ -63,45 +60,54 @@ else:
         os.environ["OPENAI_API_KEY"] = new_openai
         st.rerun()
 
-uploaded_file = st.file_uploader("Загрузи инструкцию (PDF)", type=["pdf"])
+# 1. ОБНОВЛЕНИЕ: Разрешаем PDF и PPTX
+uploaded_file = st.file_uploader("Загрузи материал (PDF или PPTX)", type=["pdf", "pptx"])
 
 if uploaded_file:
     if st.button("🚀 Создать Тест"):
         
-        # Проверка ключей перед стартом
         if not os.environ.get("LLAMA_CLOUD_API_KEY"):
             st.error("Нет ключей!")
             st.stop()
 
-        # 1. Сохраняем файл
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        # 2. ОБНОВЛЕНИЕ: Определяем расширение файла (.pdf или .pptx)
+        file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+        
+        # Сохраняем с правильным расширением
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
             tmp.write(uploaded_file.getvalue())
             tmp_path = tmp.name
 
-        # 2. Парсим
-        with st.spinner("📄 Читаю документ..."):
+        # 3. ПАРСИНГ
+        with st.spinner("📄 Читаю слайды и текст..."):
             try:
+                # LlamaParse сам поймет формат
                 parser = LlamaParse(result_type="markdown", language="ru", api_key=os.environ["LLAMA_CLOUD_API_KEY"])
-                docs = SimpleDirectoryReader(input_files=[tmp_path], file_extractor={".pdf": parser}).load_data()
+                
+                # Явно говорим, какой парсер использовать для каких файлов
+                file_extractor = {".pdf": parser, ".pptx": parser}
+                
+                docs = SimpleDirectoryReader(input_files=[tmp_path], file_extractor=file_extractor).load_data()
+                
                 if not docs:
-                    st.error("Ошибка чтения файла.")
+                    st.error("Ошибка чтения файла. Возможно, он пуст.")
                     st.stop()
                 text = docs[0].text
             except Exception as e:
                 st.error(f"Ошибка парсинга: {e}")
                 st.stop()
 
-        # 3. Генерируем
-        with st.spinner(f"🧠 Думаю ({quiz_lang})..."):
+        # 4. ГЕНЕРАЦИЯ
+        with st.spinner(f"🧠 Анализирую контент ({quiz_lang})..."):
             try:
                 Settings.llm = OpenAI(model="gpt-4o", temperature=0.1)
                 
-                # Промпт с учетом языка
                 prompt = (
-                    f"Проанализируй текст. Создай тест на языке: {quiz_lang}. "
+                    f"Проанализируй этот учебный материал. Создай тест на языке: {quiz_lang}. "
                     f"Количество вопросов: {quiz_count}. "
                     f"Сложность: {quiz_difficulty}. "
-                    "Верни JSON."
+                    "Если это презентация, учитывай текст на слайдах. "
+                    "Верни СТРОГО JSON."
                 )
                 
                 program = LLMTextCompletionProgram.from_defaults(
@@ -110,13 +116,14 @@ if uploaded_file:
                     llm=Settings.llm
                 )
                 
-                result = program(text=text[:15000])
+                # Увеличиваем лимит, так как презентации бывают большими
+                result = program(text=text[:20000])
                 st.session_state['quiz'] = result
             except Exception as e:
                 st.error(f"Ошибка AI: {e}")
                 st.stop()
 
-# --- ВЫВОД РЕЗУЛЬТАТА ---
+# --- ВЫВОД ---
 if 'quiz' in st.session_state:
     st.divider()
     for i, q in enumerate(st.session_state['quiz'].questions):
