@@ -108,6 +108,44 @@ with st.sidebar:
     
     quiz_count = st.slider("Количество вопросов:", 1, 10, 3)
 
+    st.divider()
+    st.markdown("### 📬 Есть вопросы?")
+    st.markdown(
+        """
+        <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px;">
+            <p style="margin:0; font-size: 14px;">Нашли баг или хотите внедрить это в своей компании?</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+# --- КОНТАКТЫ (НОВЫЙ БЛОК) ---
+    st.divider()
+    st.markdown("### 📬 Связь с автором")
+    
+    # Красивая плашка с текстом
+    st.markdown(
+        """
+        <div style="background-color: #f0f2f6; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+            <p style="margin:0; font-size: 14px; color: #31333F;">
+            <b>Нужен такой же инструмент?</b><br>
+            Напишите мне, чтобы обсудить внедрение AI в обучение.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    # Кнопка письма (ЗАМЕНИ ПОЧТУ НИЖЕ!)
+    my_email = "vatutovd@gmail.com"  # <--- Впиши сюда свою реальную почту
+    
+    st.link_button(
+        label="📧 Написать разработчику", 
+        url=f"mailto:{my_email}?subject=Вопрос по Vyud AI"
+    )
+    
+    st.caption("© 2025 Vyud AI")
+
 # --- ОСНОВНОЙ ЭКРАН ---
 st.title("🎓 FlowCourse AI - Test Generator")
 
@@ -201,6 +239,8 @@ if 'quiz' in st.session_state:
         # Берем название курса из имени файла или ставим дефолтное
         course_default = st.session_state.get('file_name', 'Corporate Training')
         course_title = st.text_input("Название курса:", course_default)
+
+        print(f"!!! КТО-ТО ГЕНЕРИРУЕТ СЕРТИФИКАТ: {student_name} на курс {course_title} !!!")
     
     if st.button("📄 Сгенерировать Сертификат"):
         pdf_data = create_certificate(student_name, course_title, company_logo)
