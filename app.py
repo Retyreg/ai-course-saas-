@@ -14,19 +14,17 @@ from typing import List
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib.utils import ImageReader
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 
 # --- НАСТРОЙКИ СТРАНИЦЫ ---
-st.set_page_config(page_title="V.Tech_AI Course Factory", page_icon="🎓", layout="wide")
+st.set_page_config(page_title="Vyud AI", page_icon="🎓", layout="wide")
 load_dotenv()
 
 # --- СТРУКТУРА ДАННЫХ ---
 class QuizQuestion(BaseModel):
-    scenario: str = Field(..., description="Описание ситуации")
+    scenario: str = Field(..., description="Текст вопроса или описание ситуации")
     options: List[str] = Field(..., description="4 варианта ответа")
     correct_option_id: int = Field(..., description="Индекс правильного ответа (0-3)")
-    explanation: str = Field(..., description="Объяснение")
+    explanation: str = Field(..., description="Объяснение правильного ответа")
 
 class Quiz(BaseModel):
     questions: List[QuizQuestion]
@@ -47,16 +45,11 @@ def create_certificate(student_name, course_name, logo_file=None):
         try:
             logo_file.seek(0)
             logo = ImageReader(logo_file)
-            # Рисуем лого по центру сверху
             c.drawImage(logo, width/2 - 50, height - 140, width=100, preserveAspectRatio=True, mask='auto')
         except:
-            pass # Если ошибка с картинкой, просто пропускаем
+            pass
 
     # Текст сертификата
-    # Примечание: ReportLab по умолчанию не поддерживает кириллицу без шрифтов.
-    # Для MVP используем транслит или английский, либо стандартный шрифт (который может не показать русские буквы).
-    # Чтобы не усложнять установкой шрифтов сейчас, сделаем текст на английском/универсальным.
-    
     c.setFont("Helvetica-Bold", 40)
     c.drawCentredString(width/2, height/2 + 40, "CERTIFICATE")
     
@@ -78,11 +71,15 @@ def create_certificate(student_name, course_name, logo_file=None):
     c.setFont("Helvetica", 12)
     date_str = datetime.now().strftime("%Y-%m-%d")
     c.drawString(50, 50, f"Date: {date_str}")
-    c.drawRightString(width-50, 50, "Authorized by AI CourseFlow")
+    c.drawRightString(width-50, 50, "Authorized by Vyud AI")
     
     c.save()
     buffer.seek(0)
     return buffer
+
+# --- ПРОВЕРКА КЛЮЧЕЙ (Логика) ---
+has_llama = bool(os.getenv("LLAMA_CLOUD_API_KEY"))
+has_openai = bool(os.getenv("OPENAI_API_KEY"))
 
 # --- БОКОВАЯ ПАНЕЛЬ ---
 with st.sidebar:
@@ -94,21 +91,35 @@ with st.sidebar:
     st.divider()
     st.header("⚙️ Настройки")
     
+    # ЯЗЫКИ
     quiz_lang = st.selectbox(
         "Язык теста:",
-        ["Русский", "English", "Қазақша", "O'zbekcha", "Кыргызча", "Español", "Deutsch"],
+        [
+            "Русский", 
+            "English", 
+            "Қазақша", 
+            "O'zbekcha", 
+            "Кыргызча", 
+            "Тоҷикӣ (Tajik)",       
+            "Bahasa Indonesia",     
+            "Tiếng Việt (Vietnamese)", 
+            "ภาษาไทย (Thai)",       
+            "Español", 
+            "Deutsch"
+        ],
         index=0
     )
     
+    # СЛОЖНОСТЬ
     quiz_difficulty = st.radio(
         "Сложность:",
-        ["Easy (Факты)", "Hard (Кейсы)"],
-        index=1
+        ["Easy (Факты)", "Medium (Понимание)", "Hard (Кейсы)"],
+        index=1 
     )
     
-    quiz_count = st.slider("Количество вопросов:", 1, 10, 3)
-    
-# --- КОНТАКТЫ ---
+    quiz_count = st.slider("Количество вопросов:", 1, 10, 5)
+
+    # --- КОНТАКТЫ ---
     st.divider()
     st.markdown("### 📬 Связь с автором")
     
@@ -124,31 +135,30 @@ with st.sidebar:
         unsafe_allow_html=True
     )
     
-    # 1. Показываем email для копирования (удобно для Gmail пользователей)
-    st.caption("Email для связи:")
-    st.code("vatutovd@gmail.com", language=None)
-    
-    # 2. Кнопка (для тех, у кого настроен Outlook/Apple Mail)
-    contact_url = "mailto:vatutovd@gmail.com?subject=Вопрос по Vyud AI"
-    st.link_button("📤 Открыть почтовый клиент", contact_url)
+    st.link_button("✈️ Написать в Telegram", "https://t.me/retyreg")
 
-    # 3. (Опционально) Ссылка на Telegram — работает безотказно
-    # Замени 'v_dmitry' на свой никнейм или удали этот блок, если не хочешь
-    # st.link_button("✈️ Написать в Telegram", "https://t.me/retyreg")
+    st.caption("Или на почту:")
+    st.code("vatyutovd@gmail.com", language=None)
     
+    contact_url = "mailto:vatutovd@gmail.com?subject=Вопрос по Vyud AI"
+    st.link_button("📤 Открыть почту", contact_url)
+    
+    st.divider()
+    
+    # --- СТАТУС СИСТЕМЫ (В ПОДВАЛЕ) ---
+    if has_llama and has_openai:
+        st.caption("🟢 System Status: Online & Secure")
+    else:
+        st.caption("🔴 System Status: Keys Missing")
+        
     st.caption("© 2025 Vyud AI")
 
 # --- ОСНОВНОЙ ЭКРАН ---
-st.title("🎓 FlowCourse AI - Test Generator")
+st.title("🎓 Vyud AI")
 
-# БЕЗОПАСНАЯ ПРОВЕРКА КЛЮЧЕЙ
-has_llama = bool(os.getenv("LLAMA_CLOUD_API_KEY"))
-has_openai = bool(os.getenv("OPENAI_API_KEY"))
-
-if has_llama and has_openai:
-    st.success("✅ Ключи активны (Secure Mode)")
-else:
-    st.warning("⚠️ Ключи не найдены. Введите их вручную:")
+# Если ключей НЕТ, показываем поля ввода на главном экране (блокируем работу)
+if not (has_llama and has_openai):
+    st.warning("⚠️ Система не настроена. Введите API ключи для начала работы:")
     new_llama = st.text_input("LlamaCloud Key", type="password")
     new_openai = st.text_input("OpenAI Key", type="password")
     
@@ -156,26 +166,24 @@ else:
         os.environ["LLAMA_CLOUD_API_KEY"] = new_llama
         os.environ["OPENAI_API_KEY"] = new_openai
         st.rerun()
+    
+    st.stop() # Останавливаем выполнение, пока нет ключей
 
-uploaded_file = st.file_uploader("ЗАГРУЗТЕ ФАЙЛ (PDF или PPTX)", type=["pdf", "pptx"])
+# Если ключи ЕСТЬ, сразу показываем интерфейс (без лишних плашек)
+uploaded_file = st.file_uploader("Загрузи материал (PDF или PPTX)", type=["pdf", "pptx"])
 
-# Храним название файла в сессии
 if uploaded_file and 'file_name' not in st.session_state:
     st.session_state['file_name'] = uploaded_file.name
 
 if uploaded_file:
-    if st.button("🚀 Создать Тест/Make a Test"):
+    if st.button("🚀 Создать Тест"):
         
-        if not os.environ.get("LLAMA_CLOUD_API_KEY"):
-            st.error("Нет ключей!")
-            st.stop()
-
         file_ext = os.path.splitext(uploaded_file.name)[1].lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
             tmp.write(uploaded_file.getvalue())
             tmp_path = tmp.name
 
-        with st.spinner("📄 Читаю слайды и текст/Reading slides and text..."):
+        with st.spinner("📄 Читаю слайды и текст..."):
             try:
                 parser = LlamaParse(result_type="markdown", language="ru", api_key=os.environ["LLAMA_CLOUD_API_KEY"])
                 file_extractor = {".pdf": parser, ".pptx": parser}
@@ -188,21 +196,27 @@ if uploaded_file:
                 st.error(f"Ошибка парсинга: {e}")
                 st.stop()
 
-        with st.spinner(f"🧠 Анализирую контент/Analysing content ({quiz_lang})..."):
+        with st.spinner(f"🧠 Анализирую контент ({quiz_lang})..."):
             try:
                 Settings.llm = OpenAI(model="gpt-4o", temperature=0.1)
+                
                 prompt = (
-                    f"Проанализируй этот учебный материал. Создай тест на языке: {quiz_lang}. "
+                    f"Ты методист. Проанализируй материал и создай тест на языке: {quiz_lang}. "
                     f"Количество вопросов: {quiz_count}. "
-                    f"Сложность: {quiz_difficulty}. "
+                    f"Уровень сложности: {quiz_difficulty}. "
+                    "Инструкция по сложности: "
+                    "- Easy: Вопросы на запоминание фактов и цифр. "
+                    "- Medium: Вопросы на понимание сути и определений. "
+                    "- Hard: Ситуационные задачи, требующие анализа. "
                     "Верни СТРОГО JSON."
                 )
+                
                 program = LLMTextCompletionProgram.from_defaults(
                     output_cls=Quiz,
-                    prompt_template_str=prompt + " Текст: {text}",
+                    prompt_template_str=prompt + " Текст материала: {text}",
                     llm=Settings.llm
                 )
-                result = program(text=text[:20000])
+                result = program(text=text[:25000])
                 st.session_state['quiz'] = result
             except Exception as e:
                 st.error(f"Ошибка AI: {e}")
@@ -212,7 +226,6 @@ if uploaded_file:
 if 'quiz' in st.session_state:
     st.divider()
     
-    # 1. СЕКЦИЯ ВОПРОСОВ
     for i, q in enumerate(st.session_state['quiz'].questions):
         st.subheader(f"{i+1}. {q.scenario}")
         st.radio("Варианты:", q.options, key=f"q{i}")
@@ -221,18 +234,13 @@ if 'quiz' in st.session_state:
             st.info(q.explanation)
 
     st.divider()
-    
-    # 2. СЕКЦИЯ СЕРТИФИКАТА (НОВАЯ)
     st.subheader("🏆 Генерация сертификата")
     col1, col2 = st.columns(2)
     with col1:
-        student_name = st.text_input("Имя студента (на латинице):", "Ivan Ivanov")
+        student_name = st.text_input("Имя студента (на латинице):", "Luke Skywalker")
     with col2:
-        # Берем название курса из имени файла или ставим дефолтное
         course_default = st.session_state.get('file_name', 'Corporate Training')
         course_title = st.text_input("Название курса:", course_default)
-
-        print(f"!!! КТО-ТО ГЕНЕРИРУЕТ СЕРТИФИКАТ: {student_name} на курс {course_title} !!!")
     
     if st.button("📄 Сгенерировать Сертификат"):
         pdf_data = create_certificate(student_name, course_title, company_logo)
@@ -246,7 +254,6 @@ if 'quiz' in st.session_state:
     st.divider()
     st.subheader("📦 Экспорт курса (HTML)")
     
-    # ЛОГИКА ЭКСПОРТА В HTML
     logo_html = ""
     if company_logo:
         company_logo.seek(0)
@@ -261,7 +268,7 @@ if 'quiz' in st.session_state:
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Course Export</title>
+        <title>Vyud AI Course</title>
         <style>
             body {{ font-family: sans-serif; max_width: 800px; margin: 0 auto; padding: 20px; background: #f4f4f9; }}
             .header {{ text-align: center; margin-bottom: 30px; }}
@@ -277,6 +284,7 @@ if 'quiz' in st.session_state:
         <div class="header">
             {logo_html}
             <h1>🎓 Экзамен / Test</h1>
+            <p>Generated by Vyud AI</p>
         </div>
         <div id="quiz-container"></div>
         <script>
@@ -315,8 +323,8 @@ if 'quiz' in st.session_state:
     """
 
     st.download_button(
-        label="📥 Скачать брендированный HTML",
+        label="📥 Скачать HTML (Vyud AI)",
         data=html_template,
-        file_name="branded_course.html",
+        file_name="vyud_ai_course.html",
         mime="text/html"
     )
