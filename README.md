@@ -1,11 +1,11 @@
-# 🎓 CourseFlow AI
+# 🎓 Vyud AI
 
 **Turn boring PDFs into interactive quizzes in seconds.**
 
-CourseFlow is an AI-powered engine designed to automate the work of Instructional Designers. It uses advanced RAG (Retrieval-Augmented Generation) to understand complex technical documentation and generate scenario-based assessments.
+Vyud AI is an AI-powered engine designed to automate the work of Instructional Designers. It uses advanced RAG (Retrieval-Augmented Generation) to understand complex technical documentation and generate scenario-based assessments.
 
 ## 🚀 Live Demo
-Try it here: [https://retyreg.streamlit.app/](https://retyreg.streamlit.app/)
+Try it here: https://vyudai.streamlit.app/
 
 ## 🛠 Tech Stack
 - **Core:** Python 3.11
