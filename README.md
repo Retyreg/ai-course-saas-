@@ -1,6 +1,6 @@
 # 🎓 Vyud AI
 
-**Turn boring PDFs into interactive quizzes in seconds.**
+**Turn boring pdf, pptx, docx, xlsx, txt into interactive quizzes in seconds.**
 
 Vyud AI is an AI-powered engine designed to automate the work of Instructional Designers. It uses advanced RAG (Retrieval-Augmented Generation) to understand complex technical documentation and generate scenario-based assessments.
 
