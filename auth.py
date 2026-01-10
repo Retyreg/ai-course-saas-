@@ -1,113 +1,104 @@
-import streamlit as st
 from supabase import create_client
+import streamlit as st
+import hashlib
 import os
 
-# --- 1. ПОДКЛЮЧЕНИЕ К SUPABASE ---
-try:
-    # Пытаемся взять из Streamlit Secrets (для сайта)
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-except:
-    # Если не вышло (например, запускает бот), берем из ENV
-    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-    SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
-
-# Инициализация клиента
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-else:
-    supabase = None
-    print("⚠️ WARNING: Supabase keys not found!")
-
-# --- 2. ФУНКЦИИ АВТОРИЗАЦИИ (AUTH) ---
-
-def register_user(email, password):
-    """Регистрация нового пользователя в Supabase Auth + начисление кредитов."""
-    if not supabase: return False
+# --- Инициализация Supabase ---
+def get_supabase():
     try:
-        # 1. Создаем пользователя в Auth
-        res = supabase.auth.sign_up({
-            "email": email, 
-            "password": password
-        })
-        
-        # 2. Если успешно — создаем запись в таблице кредитов
-        if res.user:
-            try:
-                # Даем 3 кредита при регистрации
-                supabase.table("users_credits").insert({"email": email, "credits": 3}).execute()
-            except Exception as e:
-                print(f"User DB creation info: {e}") # Может уже есть, не страшно
-            return True
-        return False
-    except Exception as e:
-        print(f"Registration Error: {e}")
-        return False
-
-def login_user(email, password):
-    """Вход по email/паролю."""
-    if not supabase: return None
-    try:
-        # Админский бэкдор (если нужно зайти быстро под админом без базы)
-        try:
-            if email == st.secrets["ADMIN_EMAIL"] and password == st.secrets["ADMIN_PASSWORD"]:
-                return {"email": email, "id": "admin"}
-        except:
-            pass
-
-        # Стандартный вход через Supabase
-        res = supabase.auth.sign_in_with_password({
-            "email": email, 
-            "password": password
-        })
-        
-        if res.user:
-            return {"email": res.user.email, "id": res.user.id}
-        return None
-    except Exception as e:
-        print(f"Login Error: {e}")
-        return None
-
-# --- 3. ФУНКЦИИ КРЕДИТОВ (WALLET) ---
-
-def get_user_credits(email):
-    """Получить баланс. Если юзера нет в таблице — создать."""
-    if not supabase: return 999
+        # Пробуем из streamlit secrets
+        url = st.secrets.get("SUPABASE_URL")
+        key = st.secrets.get("SUPABASE_KEY")
+    except:
+        # Или из переменных окружения
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_KEY")
     
+    if not url or not key:
+        raise ValueError("SUPABASE_URL и SUPABASE_KEY не найдены!")
+    
+    return create_client(url, key)
+
+def hash_pass(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+# --- Функции для кредитов ---
+def get_user_credits(email):
+    """Получить баланс кредитов"""
     try:
-        # Нормализуем email
-        email = email.lower().strip()
-        
-        response = supabase.table("users_credits").select("credits").eq("email", email).execute()
-        
-        if not response.data:
-            # Юзера нет в таблице кредитов? Создаем!
-            init_credits = 3
-            supabase.table("users_credits").insert({"email": email, "credits": init_credits}).execute()
-            return init_credits
-            
-        return response.data[0]["credits"]
+        supabase = get_supabase()
+        result = supabase.table("users_credits").select("credits").eq("email", email).execute()
+        if result.data and len(result.data) > 0:
+            return result.data[0]["credits"]
+        return 0
     except Exception as e:
-        print(f"Credits Error: {e}")
+        print(f"Error getting credits: {e}")
         return 0
 
 def deduct_credit(email, amount=1):
-    """Списать кредиты."""
-    if not supabase: return True
-
+    """Списать кредиты"""
     try:
-        email = email.lower().strip()
+        supabase = get_supabase()
         current = get_user_credits(email)
-        
-        if current < amount:
-            return False
-        
-        new_balance = current - amount
-        supabase.table("users_credits").update({"credits": new_balance}).eq("email", email).execute()
-        return True
+        if current >= amount:
+            supabase.table("users_credits").update({"credits": current - amount}).eq("email", email).execute()
+            return True
+        return False
     except Exception as e:
-        print(f"Deduct Error: {e}")
+        print(f"Error deducting credits: {e}")
         return False
 
-# --- АЛИАСЫ (Чтобы бот и сайт не путались) ---
-get_credits = get_user_credits
+def add_credits(email, amount):
+    """Добавить кредиты (для админки)"""
+    try:
+        supabase = get_supabase()
+        # Проверяем существует ли пользователь
+        result = supabase.table("users_credits").select("credits").eq("email", email).execute()
+        
+        if result.data and len(result.data) > 0:
+            # Обновляем
+            new_balance = result.data[0]["credits"] + amount
+            supabase.table("users_credits").update({"credits": new_balance}).eq("email", email).execute()
+        else:
+            # Создаём нового
+            supabase.table("users_credits").insert({"email": email, "credits": amount}).execute()
+        return True
+    except Exception as e:
+        print(f"Error adding credits: {e}")
+        return False
+
+# --- Авторизация (для web-app) ---
+def login_user(email, password):
+    try:
+        supabase = get_supabase()
+        # Простая проверка по хэшу (можно улучшить через Supabase Auth)
+        result = supabase.table("users_auth").select("*").eq("email", email).eq("password_hash", hash_pass(password)).execute()
+        return len(result.data) > 0
+    except:
+        return False
+
+def register_user(email, password):
+    try:
+        supabase = get_supabase()
+        # Создаём запись авторизации
+        supabase.table("users_auth").insert({"email": email, "password_hash": hash_pass(password)}).execute()
+        # Даём начальные кредиты
+        supabase.table("users_credits").insert({"email": email, "credits": 5}).execute()
+        return True
+    except:
+        return False
+
+# --- Mock для совместимости со старым кодом ---
+class MockSupabaseClient:
+    def table(self, name):
+        return self
+    def select(self, *args):
+        return self
+    def eq(self, col, val):
+        return self
+    def update(self, data):
+        return self
+    def execute(self):
+        return type('obj', (object,), {'data': []})()
+
+supabase = get_supabase() if os.environ.get("SUPABASE_URL") else MockSupabaseClient()

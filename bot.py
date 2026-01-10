@@ -9,9 +9,9 @@ from aiogram.types import Message, BotCommand, BotCommandScopeDefault
 
 # --- ИМПОРТ ЛОГИКИ ---
 try:
-    from logic import transcribe_audio, generate_quiz_struct
+    from logic import transcribe_for_bot as transcribe_audio, generate_quiz_ai as generate_quiz_struct
     # [FIX] ВАЖНО: deduct_credit (без 's' на конце!)
-    from auth import get_credits, deduct_credit 
+    from auth import get_user_credits as get_credits, deduct_credit 
 except ImportError as e:
     logging.error(f"CRITICAL IMPORT ERROR: {e}")
     # Заглушки на случай аварии
@@ -26,6 +26,8 @@ if secrets_path.exists():
     secrets = toml.load(secrets_path)
     TOKEN = secrets.get("TELEGRAM_BOT_TOKEN") or secrets.get("BOT_TOKEN")
     os.environ["OPENAI_API_KEY"] = secrets.get("OPENAI_API_KEY", "")
+    os.environ["SUPABASE_URL"] = secrets.get("SUPABASE_URL", "")
+    os.environ["SUPABASE_KEY"] = secrets.get("SUPABASE_KEY", "")
 else:
     TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
@@ -84,7 +86,7 @@ async def handle_video_note(message: Message):
 
         # 3. Генерация
         await bot.edit_message_text("🧠 Генерирую викторину...", chat_id=message.chat.id, message_id=status_msg.message_id)
-        quiz_data = await asyncio.to_thread(generate_quiz_struct, transcript)
+        quiz_data = await asyncio.to_thread(generate_quiz_struct, transcript, 5, "medium", "ru")
         
         if not quiz_data or not quiz_data.questions:
             await message.answer("❌ Не удалось придумать вопросы по этому тексту.")
